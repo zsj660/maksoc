@@ -5,29 +5,13 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { useCart, useCartLines } from "@/components/cart-provider";
 import { ORDER_KEY } from "@/lib/client-storage";
-import type { Order } from "@/lib/products";
+import type { AdminOrder } from "@/lib/admin-types";
 
-type CheckoutOrder = Order & {
-  email?: string;
-  phone?: string;
-  address?: string;
-  notes?: string;
-  lines?: Array<{
-    productId: string;
-    productName: string;
-    unitPrice: number;
-    quantity: number;
-    lineTotal: number;
-  }>;
-};
-
-function createNextOrderId(existing: Order[]) {
-  const max = existing.reduce((acc, order) => {
-    const match = order.id.match(/ORD-(\d+)/);
-    const numeric = match ? Number(match[1]) : 0;
-    return Math.max(acc, numeric);
-  }, 1000);
-  return `ORD-${max + 1}`;
+function createLocalOrderId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `LOCAL-${crypto.randomUUID()}`;
+  }
+  return `LOCAL-${new Date().getTime()}`;
 }
 
 export default function CheckoutPage() {
@@ -40,39 +24,73 @@ export default function CheckoutPage() {
     0
   );
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const [submitError, setSubmitError] = useState("");
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSubmitError("");
     const form = new FormData(event.currentTarget);
     const customer = String(form.get("customerName") || "Guest Customer");
     const email = String(form.get("email") || "");
     const phone = String(form.get("phone") || "");
     const address = String(form.get("address") || "");
     const notes = String(form.get("notes") || "");
-    const raw = window.localStorage.getItem(ORDER_KEY);
-    const existing: CheckoutOrder[] = raw ? JSON.parse(raw) : [];
-    const newOrder: CheckoutOrder = {
-      id: createNextOrderId(existing),
-      customer,
-      status: "Pending",
-      createdAt: new Date().toISOString().slice(0, 10),
-      itemCount,
-      total,
-      email,
-      phone,
-      address,
-      notes,
-      lines: lines.map((line) => ({
-        productId: line.product!.id,
-        productName: line.product!.name,
-        unitPrice: line.product!.price,
-        quantity: line.quantity,
-        lineTotal: line.product!.price * line.quantity,
-      })),
-    };
-    window.localStorage.setItem(ORDER_KEY, JSON.stringify([newOrder, ...existing]));
-    setOrderId(newOrder.id);
-    setOrdered(true);
-    clearCart();
+    const linesPayload = lines.map((line) => ({
+      productId: line.product!.id,
+      productName: line.product!.name,
+      unitPrice: line.product!.price,
+      quantity: line.quantity,
+      lineTotal: line.product!.price * line.quantity,
+    }));
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer,
+          email,
+          phone,
+          address,
+          notes,
+          itemCount,
+          total,
+          lines: linesPayload,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || "Unable to place order.");
+      }
+      const payload = (await response.json()) as { orderId: string };
+      setOrderId(payload.orderId);
+      setOrdered(true);
+      clearCart();
+    } catch (error) {
+      const raw = window.localStorage.getItem(ORDER_KEY);
+      const existing: AdminOrder[] = raw ? JSON.parse(raw) : [];
+      const fallbackOrder: AdminOrder = {
+        id: createLocalOrderId(),
+        customer,
+        status: "Pending",
+        createdAt: new Date().toISOString().slice(0, 10),
+        itemCount,
+        total,
+        email,
+        phone,
+        address,
+        notes,
+        lines: linesPayload,
+      };
+      window.localStorage.setItem(ORDER_KEY, JSON.stringify([fallbackOrder, ...existing]));
+      setOrderId(fallbackOrder.id);
+      setOrdered(true);
+      clearCart();
+      setSubmitError(
+        error instanceof Error
+          ? `Database sync failed, saved locally instead: ${error.message}`
+          : "Database sync failed, saved locally instead."
+      );
+    }
   };
 
   return (
@@ -102,10 +120,16 @@ export default function CheckoutPage() {
         <p className="mt-3 text-[#161616]/72">
           Complete your order details below. ({itemCount} item{itemCount === 1 ? "" : "s"})
         </p>
+        <div className="mt-4 rounded-xl border border-black/15 bg-[#f8f5ee] p-4 text-sm text-[#161616]/80">
+          No online payment is required. Submit this order, and our team will contact you to
+          confirm stock, shipping, and offline payment details.
+        </div>
         {!ordered ? (
           <form onSubmit={onSubmit} className="mt-8 space-y-4 rounded-2xl border border-black/10 bg-white/60 p-6">
             <div className="rounded-xl border border-black/15 bg-[#f8f5ee] p-4">
-              <p className="text-sm tracking-[0.12em]">Order Total: ${total.toFixed(2)}</p>
+              <p className="text-sm tracking-[0.12em]">
+                Estimated Order Total: ${total.toFixed(2)}
+              </p>
             </div>
             <input
               required
@@ -126,18 +150,20 @@ export default function CheckoutPage() {
               type="submit"
               className="w-full rounded-full bg-black px-5 py-3 text-xs tracking-[0.14em] text-white hover:bg-[#2b2b2b]"
             >
-              Place Order
+              Submit Order Request
             </button>
           </form>
         ) : (
           <div className="mt-8 rounded-2xl border border-black/10 bg-white/60 p-8 text-center">
             <h2 className="text-2xl tracking-[0.08em]">Order Confirmed</h2>
             <p className="mt-3 text-[#161616]/70">
-              Thank you for shopping with MAKSOC. Our team will contact you shortly.
+              Thank you. Your order request has been received. We will contact you shortly for
+              offline payment and fulfillment.
             </p>
             <p className="mt-3 text-xs tracking-[0.12em] text-[#161616]/65">Order ID: {orderId}</p>
           </div>
         )}
+        {submitError && <p className="mt-4 text-sm text-[#8b1e1e]">{submitError}</p>}
       </main>
       <SiteFooter />
     </div>
