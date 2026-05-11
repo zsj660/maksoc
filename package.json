@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "deploy": "npx vercel@latest --prod",
     "cloudinary:upload": "node scripts/upload-cloudinary.mjs"
   },
   "dependencies": {
