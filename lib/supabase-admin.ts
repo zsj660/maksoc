@@ -4,6 +4,10 @@ import { products as defaultProducts } from "@/lib/products";
 let cached: SupabaseClient | null = null;
 let seeded = false;
 
+export function hasSupabaseCredentials() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 export function getSupabaseAdmin() {
   if (cached) return cached;
   const url = process.env.SUPABASE_URL;

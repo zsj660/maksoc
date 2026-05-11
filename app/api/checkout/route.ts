@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { upsertAdminOrder, listAdminOrders } from "@/lib/admin-store";
+import { hasSupabaseCredentials, getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type CheckoutPayload = {
   customer: string;
@@ -32,6 +33,27 @@ export async function POST(request: Request) {
   if (!body?.customer || !Array.isArray(body.lines) || body.lines.length === 0) {
     return NextResponse.json({ error: "Invalid checkout payload." }, { status: 400 });
   }
+  if (!hasSupabaseCredentials()) {
+    const existingIds = listAdminOrders().map((item) => item.id);
+    const orderId = createNextOrderId(existingIds);
+    const createdAt = new Date().toISOString().slice(0, 10);
+    upsertAdminOrder({
+      id: orderId,
+      customer: body.customer,
+      status: "Pending",
+      createdAt,
+      submittedAt: new Date().toISOString(),
+      itemCount: body.itemCount,
+      total: body.total,
+      email: body.email,
+      phone: body.phone,
+      address: body.address,
+      notes: body.notes,
+      lines: body.lines,
+    });
+    return NextResponse.json({ ok: true, orderId });
+  }
+
   const supabase = getSupabaseAdmin();
   const { data: latest, error: idError } = await supabase
     .from("orders_admin")

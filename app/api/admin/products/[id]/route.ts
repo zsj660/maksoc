@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAdmin } from "@/lib/admin-api";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { deleteAdminProduct, updateAdminProduct } from "@/lib/admin-store";
+import { hasSupabaseCredentials, getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function PATCH(
   request: Request,
@@ -38,6 +39,13 @@ export async function PATCH(
   if (typeof body.material === "string") payload.material = body.material.trim();
   if (Array.isArray(body.colors)) payload.colors = body.colors;
   if (typeof body.price === "number") payload.price = body.price;
+  if (!hasSupabaseCredentials()) {
+    const product = updateAdminProduct(id, payload);
+    if (!product) {
+      return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    }
+    return NextResponse.json({ product });
+  }
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -59,6 +67,13 @@ export async function DELETE(
   const auth = await ensureAdmin();
   if (!auth.ok) return auth.response;
   const { id } = await params;
+  if (!hasSupabaseCredentials()) {
+    const ok = deleteAdminProduct(id);
+    if (!ok) {
+      return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true });
+  }
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from("products_admin").delete().eq("id", id);
   if (error) {

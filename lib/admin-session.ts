@@ -5,11 +5,7 @@ export const ADMIN_COOKIE = "maksoc_admin_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
 function getSessionSecret() {
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("Missing ADMIN_SESSION_SECRET environment variable.");
-  }
-  return secret;
+  return process.env.ADMIN_SESSION_SECRET || "maksoc_default_session_secret_change_me";
 }
 
 function getSignature(payload: string) {

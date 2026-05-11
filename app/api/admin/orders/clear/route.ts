@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { ensureAdmin } from "@/lib/admin-api";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { clearAdminOrders } from "@/lib/admin-store";
+import { hasSupabaseCredentials, getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST() {
   const auth = await ensureAdmin();
   if (!auth.ok) return auth.response;
+  if (!hasSupabaseCredentials()) {
+    clearAdminOrders();
+    return NextResponse.json({ ok: true });
+  }
 
   const supabase = getSupabaseAdmin();
   const { error: deleteLinesError } = await supabase

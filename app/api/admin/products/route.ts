@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { ensureAdmin } from "@/lib/admin-api";
-import { seedDefaultProductsIfNeeded, getSupabaseAdmin } from "@/lib/supabase-admin";
+import { addAdminProduct, listAdminProducts } from "@/lib/admin-store";
+import { hasSupabaseCredentials, seedDefaultProductsIfNeeded, getSupabaseAdmin } from "@/lib/supabase-admin";
+import type { Product } from "@/lib/products";
 
 export async function GET() {
   const auth = await ensureAdmin();
   if (!auth.ok) return auth.response;
+  if (!hasSupabaseCredentials()) {
+    return NextResponse.json({ products: listAdminProducts() });
+  }
   await seedDefaultProductsIfNeeded();
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -34,6 +39,10 @@ export async function POST(request: Request) {
   if (!body?.name || !body?.category || !body?.image) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
+  if (!["Super Wax", "Hollandairs", "Grand Super", "Small Diamond"].includes(body.category)) {
+    return NextResponse.json({ error: "Invalid category." }, { status: 400 });
+  }
+  const category = body.category as Product["category"];
   const slug = body.name
     .toLowerCase()
     .trim()
@@ -42,13 +51,17 @@ export async function POST(request: Request) {
   const payload = {
     slug,
     name: body.name.trim(),
-    category: body.category,
+    category,
     image: body.image.trim(),
     description: body.description?.trim() || "Newly added wax print fabric.",
     material: body.material?.trim() || "100% premium cotton wax print",
     colors: Array.isArray(body.colors) && body.colors.length > 0 ? body.colors : ["Multi Color"],
     price: Number(body.price ?? 0),
   };
+  if (!hasSupabaseCredentials()) {
+    const product = addAdminProduct(payload);
+    return NextResponse.json({ product });
+  }
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("products_admin")
