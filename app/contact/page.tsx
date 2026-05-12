@@ -13,7 +13,7 @@ export default function ContactPage() {
             For wholesale inquiries, custom sourcing, and support:
           </p>
           <p className="mt-4 text-sm tracking-[0.08em]">Email: hello@maksoc.com</p>
-          <p className="mt-2 text-sm tracking-[0.08em]">Phone: +233 20 000 0000</p>
+          <p className="mt-2 text-sm tracking-[0.08em]">Phone: +86 18565383304</p>
         </div>
       </main>
       <SiteFooter />

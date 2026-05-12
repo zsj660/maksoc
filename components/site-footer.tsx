@@ -23,6 +23,7 @@ export function SiteFooter() {
           <p className="mt-3 text-sm text-[#161616]/72">Global Shipping</p>
           <p className="mt-1 text-sm text-[#161616]/72">Wholesale Support</p>
           <p className="mt-1 text-sm text-[#161616]/72">Email: hello@maksoc.com</p>
+          <p className="mt-1 text-sm text-[#161616]/72">Phone: +86 18565383304</p>
         </div>
       </div>
     </footer>
